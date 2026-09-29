@@ -63,49 +63,5 @@ services:
     depends_on:
       - backend
 
-  # ------------------------------------------------------------------ migração Flex -> HTML5
-  # Serviços opcionais (perfil "migracao"). Não sobem com "docker compose up".
-  #
-  #   export ANTHROPIC_API_KEY=sk-ant-...
-  #   docker compose --profile migracao run --rm migrador        # pipeline completo
-  #   cd ../agenda-contatos-html5 && docker compose up -d --build # sobe a versão HTML5 (porta 8082)
-  #   cd ../agenda-contatos && docker compose --profile migracao run --rm e2e   # teste no navegador
-  migrador:
-    build:
-      context: ./frontend
-      target: migrador
-    image: agenda-migrador:1.0
-    profiles: ["migracao"]
-    environment:
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
-      CLAUDE_MODEL: ${CLAUDE_MODEL:-claude-sonnet-5}
-      MODO_MIGRACAO: ${MODO_MIGRACAO:-claude}
-      PROJETO_FLEX: agenda-contatos
-      API_BASE_TESTE: http://backend:8080/api
-    volumes:
-      - ./:/workspace/agenda-contatos
-      - ../agenda-contatos-html5:/workspace/agenda-contatos-html5
-    command: ["python", "migrar.py",
-              "--origem", "/workspace/agenda-contatos/frontend",
-              "--destino", "/workspace/agenda-contatos-html5"]
-    depends_on:
-      - backend
-
-  e2e:
-    image: mcr.microsoft.com/playwright:v1.56.0-noble
-    profiles: ["migracao"]
-    environment:
-      APP_URL: ${APP_URL:-http://agenda-contatos-html5/}
-    volumes:
-      - ./migracao/e2e:/e2e:ro
-      - ./migracao/execucoes:/resultados
-    command:
-      - bash
-      - -c
-      - >-
-        mkdir -p /tmp/e2e && cp /e2e/teste-e2e.mjs /tmp/e2e/ && cd /tmp/e2e &&
-        npm install --no-save --no-audit --no-fund --loglevel=error playwright@1.56.0 &&
-        node teste-e2e.mjs "$$APP_URL" "/resultados/e2e-$$(date +%Y%m%d-%H%M%S)"
-
 volumes:
   dados-mysql:
