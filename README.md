@@ -99,6 +99,8 @@ Na tela:
 
 **Alternativa com Flash Player de verdade:** baixe o *Flash Player Projector (content debugger)* na página de downloads de debug da Adobe, abra o projector e use *File → Open* com `http://localhost:8080/Agenda.swf`. Como a URL da API é relativa (`api`), ela aponta para `http://localhost:8080/api`.
 
+![Tela Principal](tela_original_flex.png)
+
 ### 7. Acessar o banco (opcional)
 
 ```bash
@@ -118,7 +120,3 @@ docker compose down -v              # remove também o volume do MySQL (o init.s
 docker compose up -d --build frontend   # recompila só o frontend depois de editar o MXML
 docker compose up -d --build backend    # recompila só o backend depois de editar o Java
 ```
-
-### Exemplo de Tela
-
-![Tela Principal](tela_original_flex.png)
