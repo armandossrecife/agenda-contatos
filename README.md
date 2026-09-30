@@ -118,3 +118,7 @@ docker compose down -v              # remove também o volume do MySQL (o init.s
 docker compose up -d --build frontend   # recompila só o frontend depois de editar o MXML
 docker compose up -d --build backend    # recompila só o backend depois de editar o Java
 ```
+
+### Exemplo de Tela
+
+![Tela Principal](tela_original_flex.png)
