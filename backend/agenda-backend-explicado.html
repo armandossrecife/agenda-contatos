@@ -1,0 +1,925 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Agenda de Contatos: como funciona o backend Java 7</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+:root{
+  color-scheme: light;
+  --paper:#F4F6F9; --surface:#FFFFFF; --ink:#17202C; --muted:#566273; --line:#DCE2EA; --line-strong:#B9C2CE;
+  --web:#0E7C86; --web-t:#E5F3F4;
+  --svc:#5B4BC4; --svc-t:#EEECFA;
+  --dao:#B0601A; --dao-t:#FBF0E4;
+  --mod:#BE3A69; --mod-t:#FBEAF0;
+  --db:#2F6FB0; --db-t:#E7EFF8;
+  --cli:#5E6878; --cli-t:#EEF1F5;
+  --ok:#1E7B4C; --ok-t:#E5F4EC; --bad:#B42318; --bad-t:#FDECEA;
+  --sans:"IBM Plex Sans", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --mono:"IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:calc(env(safe-area-inset-top,0px) + 16px);scroll-behavior:smooth}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{transition:none!important;animation:none!important}}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--sans);font-size:16px;line-height:1.6}
+a{color:var(--web)}
+:focus-visible{outline:3px solid #2F6FB0;outline-offset:2px;border-radius:4px}
+code,pre,kbd{font-family:var(--mono)}
+code{font-size:.88em;background:#EDF0F4;padding:.1em .35em;border-radius:4px}
+img,svg{max-width:100%}
+
+.shell{display:grid;grid-template-columns:250px minmax(0,1fr);max-width:1320px;margin:0 auto}
+nav.side{position:sticky;top:env(safe-area-inset-top,0px);align-self:start;height:100vh;overflow:auto;padding:28px 18px 28px 24px;border-right:1px solid var(--line)}
+.brand{font-weight:700;font-size:1.02rem;line-height:1.3;margin:0 0 4px}
+.brand-sub{color:var(--muted);font-size:.85rem;margin:0 0 22px}
+nav.side ol{list-style:none;margin:0;padding:0}
+nav.side li a{display:flex;gap:10px;align-items:center;padding:7px 10px;border-radius:8px;color:var(--ink);text-decoration:none;font-size:.93rem}
+nav.side li a:hover{background:#E8ECF1}
+nav.side li a.active{background:var(--surface);box-shadow:inset 3px 0 0 var(--web);font-weight:600}
+.swatch{width:9px;height:9px;border-radius:2px;flex:none;background:var(--line-strong)}
+main{padding:40px 48px 80px;min-width:0}
+section{padding:8px 0 44px}
+section+section{border-top:1px solid var(--line);padding-top:40px}
+h1{font-size:clamp(1.9rem,3.2vw,2.7rem);line-height:1.12;letter-spacing:-.02em;margin:0 0 14px;font-weight:700;max-width:22ch}
+h2{font-size:1.6rem;line-height:1.2;letter-spacing:-.01em;margin:0 0 10px}
+h3{font-size:1.12rem;margin:26px 0 8px}
+p{margin:0 0 14px;max-width:72ch}
+.lede{font-size:1.12rem;color:#2C3644;max-width:66ch}
+.muted{color:var(--muted)}
+.small{font-size:.88rem}
+
+.specs{display:flex;flex-wrap:wrap;gap:8px;margin:18px 0 26px;padding:0;list-style:none}
+.specs li{background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:5px 13px;font-size:.88rem}
+.specs b{font-weight:600}
+
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:22px}
+.scroll-x{overflow-x:auto}
+.diagram{min-width:760px;display:block}
+.diagram .hit{cursor:pointer}
+.diagram .hit:hover rect,.diagram .hit:focus rect{stroke-width:2.4}
+.diagram text{font-family:var(--sans)}
+.caption{font-size:.88rem;color:var(--muted);margin:12px 0 0}
+
+.legend{display:flex;flex-wrap:wrap;gap:16px;margin-top:14px;font-size:.86rem;color:var(--muted)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.legend i{width:12px;height:12px;border-radius:3px;display:inline-block}
+
+.two{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+.tree{font-family:var(--mono);font-size:.84rem;line-height:1.75;white-space:pre;margin:0}
+.tree .d{color:var(--muted)}
+.tree .web{color:var(--web)} .tree .svc{color:var(--svc)} .tree .dao{color:var(--dao)} .tree .mod{color:var(--mod)} .tree .cfg{color:#3F4A59;font-weight:500}
+
+/* Componentes */
+.layer{margin:22px 0 10px;display:flex;align-items:baseline;gap:12px}
+.layer h3{margin:0}
+.layer .path{font-family:var(--mono);font-size:.82rem;color:var(--muted)}
+.comp{background:var(--surface);border:1px solid var(--line);border-left:5px solid var(--c);border-radius:10px;padding:16px 20px;margin:0 0 12px;transition:box-shadow .3s, background-color .3s}
+.comp.flash{box-shadow:0 0 0 3px var(--c);background:var(--t)}
+.comp header{display:flex;flex-wrap:wrap;justify-content:space-between;gap:6px 14px;align-items:baseline}
+.comp h4{margin:0;font-family:var(--mono);font-size:1rem;font-weight:500}
+.comp .loc{font-size:.8rem;color:var(--muted)}
+.comp p{margin:6px 0 8px;font-size:.95rem}
+.comp ul{margin:0;padding-left:18px;font-size:.92rem}
+.comp li{margin:3px 0}
+.c-web{--c:var(--web);--t:var(--web-t)} .c-svc{--c:var(--svc);--t:var(--svc-t)} .c-dao{--c:var(--dao);--t:var(--dao-t)} .c-mod{--c:var(--mod);--t:var(--mod-t)}
+
+/* Fluxo numerado */
+.steps{counter-reset:s;list-style:none;padding:0;margin:16px 0 0}
+.steps li{counter-increment:s;position:relative;padding:0 0 14px 44px;max-width:72ch}
+.steps li::before{content:counter(s);position:absolute;left:0;top:0;width:28px;height:28px;border-radius:50%;background:var(--ink);color:#fff;font-size:.82rem;font-weight:600;display:grid;place-items:center}
+.steps li::after{content:"";position:absolute;left:13.5px;top:30px;bottom:2px;width:1px;background:var(--line-strong)}
+.steps li:last-child::after{display:none}
+
+pre.mermaid{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px;margin:0;overflow-x:auto;text-align:center}
+
+/* API */
+.api{display:grid;grid-template-columns:300px minmax(0,1fr);gap:18px}
+.ep-list{display:flex;flex-direction:column;gap:6px}
+.ep{display:flex;gap:10px;align-items:center;text-align:left;width:100%;background:var(--surface);border:1px solid var(--line);border-radius:9px;padding:10px 12px;font:inherit;font-size:.9rem;cursor:pointer;color:var(--ink)}
+.ep:hover{border-color:var(--line-strong)}
+.ep[aria-selected="true"]{border-color:var(--ink);box-shadow:inset 0 0 0 1px var(--ink)}
+.verb{font-family:var(--mono);font-size:.74rem;font-weight:500;padding:2px 7px;border-radius:5px;min-width:58px;text-align:center;flex:none}
+.v-GET{background:#E3F1EA;color:#1E6B45} .v-POST{background:#E6EEF9;color:#24589A} .v-PUT{background:#FBF0DD;color:#8A520E} .v-DELETE{background:#FCE7E6;color:#A12A21}
+.ep code{background:none;padding:0;font-size:.86rem}
+.ep-detail h3{margin-top:0;font-family:var(--mono);font-size:1.02rem;font-weight:500}
+.code{background:#F7F8FA;border:1px solid var(--line);border-radius:10px;padding:14px 16px;font-size:.82rem;line-height:1.55;overflow-x:auto;margin:6px 0 14px;white-space:pre}
+.code-label{font-size:.82rem;font-weight:600;color:var(--muted);margin:10px 0 0;display:flex;gap:8px;align-items:center}
+.status{font-family:var(--mono);font-size:.75rem;padding:1px 7px;border-radius:5px}
+.s-ok{background:var(--ok-t);color:var(--ok)} .s-bad{background:var(--bad-t);color:var(--bad)}
+
+/* Simuladores */
+.controls{display:flex;flex-wrap:wrap;gap:14px 22px;margin:0 0 16px}
+.field{display:flex;flex-direction:column;gap:5px;font-size:.86rem;font-weight:500}
+.seg{display:inline-flex;border:1px solid var(--line-strong);border-radius:9px;overflow:hidden;background:var(--surface)}
+.seg button{font:inherit;font-size:.86rem;font-weight:500;border:0;background:none;padding:7px 13px;cursor:pointer;color:var(--ink)}
+.seg button+button{border-left:1px solid var(--line-strong)}
+.seg button[aria-pressed="true"]{background:var(--ink);color:#fff}
+.trace{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.trace .box{border:1px solid var(--line);border-radius:10px;padding:12px 14px;background:#FAFBFC}
+.trace .box h4{margin:0 0 6px;font-size:.84rem;color:var(--muted);font-weight:600}
+.trace .box pre{margin:0;font-size:.8rem;white-space:pre-wrap;word-break:break-word}
+
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.form-grid label{display:flex;flex-direction:column;gap:5px;font-size:.86rem;font-weight:500}
+.form-grid input,.form-grid textarea{font:inherit;font-size:.92rem;padding:8px 10px;border:1px solid var(--line-strong);border-radius:8px;background:#fff;color:var(--ink)}
+.form-grid textarea{min-height:76px;resize:vertical;font-family:var(--mono);font-size:.84rem}
+.full{grid-column:1/-1}
+.hint{font-weight:400;color:var(--muted);font-size:.8rem}
+.btn{font:inherit;font-weight:600;font-size:.92rem;background:var(--ink);color:#fff;border:0;border-radius:9px;padding:9px 16px;cursor:pointer}
+.btn.ghost{background:none;color:var(--ink);border:1px solid var(--line-strong)}
+
+table{border-collapse:collapse;width:100%;font-size:.92rem}
+th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-weight:600;color:var(--muted);font-size:.84rem;background:#F7F8FA}
+
+.risk{display:grid;grid-template-columns:110px minmax(0,1fr);gap:4px 16px;padding:14px 0;border-bottom:1px solid var(--line)}
+.risk:last-child{border-bottom:0}
+.risk h4{margin:0 0 4px;font-size:1rem}
+.risk p{margin:0;font-size:.94rem}
+.sev{font-size:.78rem;font-weight:600;padding:3px 9px;border-radius:999px;align-self:start;justify-self:start}
+.sev-a{background:var(--bad-t);color:var(--bad)} .sev-m{background:#FBF0DD;color:#8A520E} .sev-b{background:#E8ECF1;color:#3F4A59}
+
+footer{color:var(--muted);font-size:.85rem;padding-top:24px;border-top:1px solid var(--line)}
+
+@media (max-width:1000px){
+  .shell{grid-template-columns:1fr}
+  nav.side{position:static;height:auto;border-right:0;border-bottom:1px solid var(--line);padding:18px 16px 10px}
+  nav.side ol{display:flex;overflow-x:auto;gap:4px;padding-bottom:6px}
+  nav.side li a{white-space:nowrap}
+  .brand-sub{margin-bottom:12px}
+  main{padding:28px 18px 60px}
+  .api,.two,.trace{grid-template-columns:1fr}
+}
+@media (max-width:600px){.form-grid{grid-template-columns:1fr}.risk{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="shell">
+<nav class="side" aria-label="Seções">
+  <p class="brand">Agenda de Contatos</p>
+  <p class="brand-sub">Backend Java 7, Servlets e JDBC</p>
+  <ol>
+    <li><a href="#visao"><span class="swatch" style="background:var(--ink)"></span>Visão geral</a></li>
+    <li><a href="#estrutura"><span class="swatch"></span>Estrutura de arquivos</a></li>
+    <li><a href="#componentes"><span class="swatch" style="background:var(--svc)"></span>Componentes</a></li>
+    <li><a href="#fluxo"><span class="swatch" style="background:var(--web)"></span>Fluxo de uma requisição</a></li>
+    <li><a href="#dados"><span class="swatch" style="background:var(--db)"></span>Modelo de dados</a></li>
+    <li><a href="#api"><span class="swatch" style="background:var(--web)"></span>Endpoints da API</a></li>
+    <li><a href="#flash"><span class="swatch" style="background:var(--cli)"></span>Adaptações para Flash</a></li>
+    <li><a href="#validacao"><span class="swatch" style="background:var(--svc)"></span>Validação na prática</a></li>
+    <li><a href="#deploy"><span class="swatch" style="background:var(--dao)"></span>Build e implantação</a></li>
+    <li><a href="#testes"><span class="swatch" style="background:var(--ok)"></span>Testes</a></li>
+    <li><a href="#atencao"><span class="swatch" style="background:var(--bad)"></span>Pontos de atenção</a></li>
+  </ol>
+</nav>
+
+<main>
+<!-- ================= VISÃO GERAL ================= -->
+<section id="visao">
+  <h1>Como funciona o backend da Agenda de Contatos</h1>
+  <p class="lede">Uma API REST que guarda contatos (nome, vários telefones, vários e-mails e um endereço) num banco MySQL. Foi escrita em Java 7 puro, sem frameworks: Servlets recebem as requisições, um serviço valida os dados e um DAO conversa com o banco via JDBC.</p>
+  <ul class="specs">
+    <li><b>Java 7</b> (bytecode 1.7)</li>
+    <li><b>Tomcat 7</b> com Servlet 3.0</li>
+    <li><b>MySQL 5.7</b> via JDBC</li>
+    <li><b>Gson 2.8.9</b> para JSON</li>
+    <li><b>10 classes</b>, 868 linhas</li>
+    <li><b>4 testes</b> JUnit 4</li>
+    <li>Empacotado como <b>WAR</b> em Docker</li>
+  </ul>
+
+  <div class="panel">
+    <div class="scroll-x">
+    <svg class="diagram" viewBox="0 0 910 500" role="img" aria-labelledby="arqT arqD">
+      <title id="arqT">Arquitetura em camadas do backend</title>
+      <desc id="arqD">Clientes Flex e navegador enviam JSON por HTTP ao contêiner Tomcat. Dentro dele, a camada web chama a camada de serviço, que chama a camada de persistência. O modelo atravessa as três camadas. A persistência acessa o MySQL por JDBC, num segundo contêiner.</desc>
+      <defs>
+        <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#566273"/></marker>
+      </defs>
+
+      <!-- Clientes -->
+      <rect x="14" y="58" width="158" height="84" rx="10" fill="#EEF1F5" stroke="#9AA3AF"/>
+      <text x="93" y="88" text-anchor="middle" font-size="14" font-weight="600" fill="#17202C">Cliente Flex</text>
+      <text x="93" y="108" text-anchor="middle" font-size="12" fill="#566273">SWF no Flash Player</text>
+      <text x="93" y="125" text-anchor="middle" font-size="12" fill="#566273">(GET e POST apenas)</text>
+      <rect x="14" y="152" width="158" height="52" rx="10" fill="#EEF1F5" stroke="#9AA3AF"/>
+      <text x="93" y="174" text-anchor="middle" font-size="14" font-weight="600" fill="#17202C">Navegador ou curl</text>
+      <text x="93" y="192" text-anchor="middle" font-size="12" fill="#566273">todos os verbos HTTP</text>
+      <path d="M172 100 H218" stroke="#566273" stroke-width="1.6" fill="none" marker-end="url(#ar)"/>
+      <path d="M172 178 H196 V160 H218" stroke="#566273" stroke-width="1.6" fill="none" marker-end="url(#ar)"/>
+      <text x="93" y="236" text-anchor="middle" font-size="12" fill="#566273">HTTP com corpo JSON</text>
+      <text x="93" y="252" text-anchor="middle" font-size="12" fill="#566273">em UTF-8</text>
+
+      <!-- Contêiner app -->
+      <rect x="204" y="14" width="414" height="476" rx="14" fill="#FBFCFD" stroke="#9AA3AF" stroke-dasharray="6 5"/>
+      <text x="220" y="38" font-size="12.5" font-weight="600" fill="#566273">Contêiner da aplicação: Tomcat 7 com JRE 7, porta 8080</text>
+
+      <!-- Web -->
+      <rect x="220" y="54" width="318" height="128" rx="10" fill="#E5F3F4" stroke="#0E7C86"/>
+      <text x="236" y="77" font-size="13.5" font-weight="700" fill="#0E7C86">Camada web: Servlets REST</text>
+      <g class="hit" data-comp="ApiServlet" tabindex="0" role="button" aria-label="Ver ApiServlet">
+        <rect x="236" y="88" width="152" height="32" rx="7" fill="#fff" stroke="#0E7C86"/>
+        <text x="312" y="109" text-anchor="middle" font-size="12.5" fill="#17202C">ApiServlet (base)</text>
+      </g>
+      <text x="400" y="102" font-size="11" fill="#566273">recursos estáticos:</text>
+      <text x="400" y="116" font-size="11" fill="#566273">index.html, crossdomain.xml</text>
+      <g class="hit" data-comp="ContatoServlet" tabindex="0" role="button" aria-label="Ver ContatoServlet">
+        <rect x="236" y="132" width="146" height="32" rx="7" fill="#fff" stroke="#0E7C86"/>
+        <text x="309" y="153" text-anchor="middle" font-size="12.5" fill="#17202C">ContatoServlet</text>
+      </g>
+      <g class="hit" data-comp="HealthServlet" tabindex="0" role="button" aria-label="Ver HealthServlet">
+        <rect x="390" y="132" width="136" height="32" rx="7" fill="#fff" stroke="#0E7C86"/>
+        <text x="458" y="153" text-anchor="middle" font-size="12.5" fill="#17202C">HealthServlet</text>
+      </g>
+      <path d="M500 182 V198" stroke="#566273" stroke-width="1.6" marker-end="url(#ar)"/>
+
+      <!-- Serviço -->
+      <rect x="220" y="200" width="318" height="116" rx="10" fill="#EEECFA" stroke="#5B4BC4"/>
+      <text x="236" y="223" font-size="13.5" font-weight="700" fill="#5B4BC4">Camada de serviço: regras</text>
+      <g class="hit" data-comp="ContatoService" tabindex="0" role="button" aria-label="Ver ContatoService">
+        <rect x="236" y="234" width="130" height="32" rx="7" fill="#fff" stroke="#5B4BC4"/>
+        <text x="301" y="255" text-anchor="middle" font-size="12.5" fill="#17202C">ContatoService</text>
+      </g>
+      <g class="hit" data-comp="ContatoValidator" tabindex="0" role="button" aria-label="Ver ContatoValidator">
+        <rect x="374" y="234" width="148" height="32" rx="7" fill="#fff" stroke="#5B4BC4"/>
+        <text x="448" y="255" text-anchor="middle" font-size="12.5" fill="#17202C">ContatoValidator</text>
+      </g>
+      <g class="hit" data-comp="ValidacaoException" tabindex="0" role="button" aria-label="Ver ValidacaoException">
+        <rect x="236" y="274" width="160" height="32" rx="7" fill="#fff" stroke="#5B4BC4"/>
+        <text x="316" y="295" text-anchor="middle" font-size="12.5" fill="#17202C">ValidacaoException</text>
+      </g>
+      <path d="M500 316 V334" stroke="#566273" stroke-width="1.6" marker-end="url(#ar)"/>
+
+      <!-- DAO -->
+      <rect x="220" y="336" width="318" height="104" rx="10" fill="#FBF0E4" stroke="#B0601A"/>
+      <text x="236" y="359" font-size="13.5" font-weight="700" fill="#B0601A">Camada de persistência: JDBC</text>
+      <g class="hit" data-comp="ContatoDao" tabindex="0" role="button" aria-label="Ver ContatoDao">
+        <rect x="236" y="372" width="116" height="32" rx="7" fill="#fff" stroke="#B0601A"/>
+        <text x="294" y="393" text-anchor="middle" font-size="12.5" fill="#17202C">ContatoDao</text>
+      </g>
+      <g class="hit" data-comp="ConnectionFactory" tabindex="0" role="button" aria-label="Ver ConnectionFactory">
+        <rect x="360" y="372" width="154" height="32" rx="7" fill="#fff" stroke="#B0601A"/>
+        <text x="437" y="393" text-anchor="middle" font-size="12.5" fill="#17202C">ConnectionFactory</text>
+      </g>
+
+      <!-- Modelo -->
+      <g class="hit" data-comp="Contato" tabindex="0" role="button" aria-label="Ver modelo Contato">
+        <rect x="550" y="54" width="54" height="386" rx="10" fill="#FBEAF0" stroke="#BE3A69"/>
+        <text transform="translate(582 247) rotate(-90)" text-anchor="middle" font-size="13.5" font-weight="700" fill="#BE3A69">Modelo: Contato e Endereco</text>
+      </g>
+
+      <text x="220" y="478" font-size="11.5" fill="#566273">Bibliotecas: Servlet API 3.0, Gson 2.8.9, mysql-connector-java 5.1.49</text>
+
+      <!-- JDBC -->
+      <path d="M440 440 V458 H770 V382" stroke="#2F6FB0" stroke-width="1.8" fill="none" marker-end="url(#ar)"/>
+      <text x="642" y="451" font-size="12" font-weight="600" fill="#2F6FB0">JDBC (uma conexão por operação)</text>
+
+      <!-- DB -->
+      <rect x="650" y="96" width="246" height="300" rx="14" fill="#FBFCFD" stroke="#9AA3AF" stroke-dasharray="6 5"/>
+      <text x="666" y="120" font-size="12.5" font-weight="600" fill="#566273">Contêiner db: MySQL 5.7, 3306</text>
+      <g class="hit" data-comp="schema" tabindex="0" role="button" aria-label="Ver modelo de dados">
+        <path d="M680 160 V350 A90 18 0 0 0 860 350 V160" fill="#E7EFF8" stroke="#2F6FB0"/>
+        <ellipse cx="770" cy="160" rx="90" ry="18" fill="#D5E3F3" stroke="#2F6FB0"/>
+        <text x="770" y="165" text-anchor="middle" font-size="12.5" font-weight="700" fill="#2F6FB0">banco agenda</text>
+        <rect x="700" y="196" width="140" height="30" rx="6" fill="#fff" stroke="#2F6FB0"/>
+        <text x="770" y="216" text-anchor="middle" font-size="12.5" fill="#17202C">contato</text>
+        <rect x="700" y="240" width="140" height="30" rx="6" fill="#fff" stroke="#2F6FB0"/>
+        <text x="770" y="260" text-anchor="middle" font-size="12.5" fill="#17202C">contato_telefone</text>
+        <rect x="700" y="284" width="140" height="30" rx="6" fill="#fff" stroke="#2F6FB0"/>
+        <text x="770" y="304" text-anchor="middle" font-size="12.5" fill="#17202C">contato_email</text>
+      </g>
+    </svg>
+    </div>
+    <div class="legend">
+      <span><i style="background:var(--web)"></i>Web: recebe HTTP e responde JSON</span>
+      <span><i style="background:var(--svc)"></i>Serviço: normaliza, valida e delega</span>
+      <span><i style="background:var(--dao)"></i>Persistência: SQL e transações</span>
+      <span><i style="background:var(--mod)"></i>Modelo: objetos que circulam entre as camadas</span>
+      <span><i style="background:var(--db)"></i>Banco MySQL</span>
+    </div>
+    <p class="caption">Clique em qualquer classe do diagrama para ver sua descrição. Cada camada só conhece a camada imediatamente abaixo; o modelo é compartilhado por todas.</p>
+  </div>
+
+  <h3>A ideia em três frases</h3>
+  <p>Cada URL <code>/api/contatos…</code> cai no <code>ContatoServlet</code>, que herda da <code>ApiServlet</code> o tratamento comum (codificação, JSON, erros e o “disfarce” de PUT e DELETE para o Flash). O servlet converte o JSON em um objeto <code>Contato</code> e entrega ao <code>ContatoService</code>, que limpa e valida os dados antes de chamar o <code>ContatoDao</code>. O DAO executa SQL parametrizado em transação e devolve o contato pronto, que volta ao cliente como JSON.</p>
+</section>
+
+<!-- ================= ESTRUTURA ================= -->
+<section id="estrutura">
+  <h2>Estrutura de arquivos</h2>
+  <p>Layout padrão do Maven, com um pacote Java por camada. Não há arquivos de configuração do Spring, JPA ou similares: o registro dos servlets é feito por anotação <code>@WebServlet</code>.</p>
+  <div class="two">
+    <div class="panel scroll-x">
+<pre class="tree"><span class="cfg">backend/</span>
+├── <span class="cfg">pom.xml</span>              <span class="d">build Maven, packaging war</span>
+├── <span class="cfg">Dockerfile</span>           <span class="d">build em 2 etapas</span>
+└── src/
+    ├── main/
+    │   ├── java/br/ufpi/agenda/
+    │   │   ├── <span class="mod">model/</span>
+    │   │   │   ├── <span class="mod">Contato.java</span>
+    │   │   │   └── <span class="mod">Endereco.java</span>
+    │   │   ├── <span class="dao">dao/</span>
+    │   │   │   ├── <span class="dao">ConnectionFactory.java</span>
+    │   │   │   └── <span class="dao">ContatoDao.java</span>
+    │   │   ├── <span class="svc">service/</span>
+    │   │   │   ├── <span class="svc">ContatoService.java</span>
+    │   │   │   ├── <span class="svc">ContatoValidator.java</span>
+    │   │   │   └── <span class="svc">ValidacaoException.java</span>
+    │   │   └── <span class="web">web/</span>
+    │   │       ├── <span class="web">ApiServlet.java</span>
+    │   │       ├── <span class="web">ContatoServlet.java</span>
+    │   │       └── <span class="web">HealthServlet.java</span>
+    │   └── webapp/
+    │       ├── WEB-INF/web.xml  <span class="d">só welcome-file</span>
+    │       ├── crossdomain.xml  <span class="d">política Flash</span>
+    │       └── index.html       <span class="d">links de teste</span>
+    └── test/java/br/ufpi/agenda/service/
+        └── ContatoValidatorTest.java</pre>
+    </div>
+    <div>
+      <h3 style="margin-top:0">Tamanho de cada classe</h3>
+      <p class="small muted">Linhas por arquivo. O DAO concentra mais de um quarto do código, porque monta o SQL e as transações à mão.</p>
+      <svg viewBox="0 0 420 330" role="img" aria-label="Gráfico de barras com linhas por classe" style="width:100%;height:auto">
+        <g font-family="IBM Plex Sans, sans-serif" font-size="12">
+          <!-- escala: 238 linhas = 230px -->
+          <g transform="translate(0,6)">
+            <text x="140" y="14" text-anchor="end" fill="#17202C">ContatoDao</text><rect x="150" y="3" width="230" height="16" rx="3" fill="#B0601A"/><text x="384" y="15" font-size="11" fill="#566273">238</text>
+            <text x="140" y="44" text-anchor="end" fill="#17202C">ContatoServlet</text><rect x="150" y="33" width="153" height="16" rx="3" fill="#0E7C86"/><text x="307" y="45" font-size="11" fill="#566273">158</text>
+            <text x="140" y="74" text-anchor="end" fill="#17202C">ApiServlet</text><rect x="150" y="63" width="134" height="16" rx="3" fill="#0E7C86"/><text x="288" y="75" font-size="11" fill="#566273">139</text>
+            <text x="140" y="104" text-anchor="end" fill="#17202C">ContatoValidator</text><rect x="150" y="93" width="98" height="16" rx="3" fill="#5B4BC4"/><text x="252" y="105" font-size="11" fill="#566273">101</text>
+            <text x="140" y="134" text-anchor="end" fill="#17202C">ContatoService</text><rect x="150" y="123" width="46" height="16" rx="3" fill="#5B4BC4"/><text x="200" y="135" font-size="11" fill="#566273">48</text>
+            <text x="140" y="164" text-anchor="end" fill="#17202C">Endereco</text><rect x="150" y="153" width="40" height="16" rx="3" fill="#BE3A69"/><text x="194" y="165" font-size="11" fill="#566273">41</text>
+            <text x="140" y="194" text-anchor="end" fill="#17202C">Contato</text><rect x="150" y="183" width="37" height="16" rx="3" fill="#BE3A69"/><text x="191" y="195" font-size="11" fill="#566273">38</text>
+            <text x="140" y="224" text-anchor="end" fill="#17202C">ConnectionFactory</text><rect x="150" y="213" width="36" height="16" rx="3" fill="#B0601A"/><text x="190" y="225" font-size="11" fill="#566273">37</text>
+            <text x="140" y="254" text-anchor="end" fill="#17202C">HealthServlet</text><rect x="150" y="243" width="35" height="16" rx="3" fill="#0E7C86"/><text x="189" y="255" font-size="11" fill="#566273">36</text>
+            <text x="140" y="284" text-anchor="end" fill="#17202C">ValidacaoException</text><rect x="150" y="273" width="31" height="16" rx="3" fill="#5B4BC4"/><text x="185" y="285" font-size="11" fill="#566273">32</text>
+            <text x="140" y="314" text-anchor="end" fill="#566273">teste do validador</text><rect x="150" y="303" width="70" height="16" rx="3" fill="#1E7B4C"/><text x="224" y="315" font-size="11" fill="#566273">72</text>
+          </g>
+        </g>
+      </svg>
+    </div>
+  </div>
+</section>
+
+<!-- ================= COMPONENTES ================= -->
+<section id="componentes">
+  <h2>Componentes</h2>
+  <p>As dez classes de produção, agrupadas por camada. O diagrama de classes abaixo mostra quem depende de quem; os cartões explicam o papel de cada uma.</p>
+
+<pre class="mermaid">
+%%{init: {"theme":"base","themeVariables":{"primaryColor":"#FFFFFF","primaryBorderColor":"#566273","primaryTextColor":"#17202C","lineColor":"#566273","fontFamily":"IBM Plex Sans, sans-serif","fontSize":"14px"}}}%%
+classDiagram
+  direction LR
+  class HttpServlet
+  class ApiServlet {
+    &lt;&lt;abstract&gt;&gt;
+    #GSON Gson
+    #service(req, resp)
+    #json(req, resp, status, corpo)
+    #erro(req, resp, status, msg)
+    #lerCorpo(req) String
+  }
+  class ContatoServlet {
+    -service ContatoService
+    #doGet() / doPost() / doPut() / doDelete()
+    -idDaUrl(req) Long
+  }
+  class HealthServlet {
+    #doGet()
+  }
+  class ContatoService {
+    +listar(filtro) List
+    +buscar(id) Contato
+    +criar(c) Contato
+    +atualizar(id, c) Contato
+    +excluir(id) boolean
+  }
+  class ContatoValidator {
+    +normalizarEValidar(c)
+  }
+  class ValidacaoException {
+    +getErros() List
+  }
+  class ContatoDao {
+    +listar(filtro) List
+    +buscarPorId(id) Contato
+    +inserir(c) Contato
+    +atualizar(c) boolean
+    +excluir(id) boolean
+  }
+  class ConnectionFactory {
+    +getConnection()$ Connection
+  }
+  class Contato {
+    -Long id
+    -String nome
+    -List telefones
+    -List emails
+  }
+  class Endereco {
+    -String rua, cep, cidade
+    -String estado, pais
+  }
+  HttpServlet &lt;|-- ApiServlet
+  ApiServlet &lt;|-- ContatoServlet
+  ApiServlet &lt;|-- HealthServlet
+  ContatoServlet --&gt; ContatoService
+  ContatoService --&gt; ContatoValidator
+  ContatoService --&gt; ContatoDao
+  ContatoValidator ..&gt; ValidacaoException : lança
+  ContatoDao ..&gt; ConnectionFactory
+  HealthServlet ..&gt; ConnectionFactory
+  Contato *-- Endereco
+  ContatoDao ..&gt; Contato
+</pre>
+
+  <div class="layer"><h3 style="color:var(--web)">Camada web</h3><span class="path">br.ufpi.agenda.web</span></div>
+  <article class="comp c-web" id="c-ApiServlet">
+    <header><h4>ApiServlet</h4><span class="loc">abstrata, 139 linhas</span></header>
+    <p>Classe base de todos os endpoints. Sobrescreve <code>service()</code> para aplicar regras comuns antes de despachar para o método certo.</p>
+    <ul>
+      <li>Define UTF-8 na requisição e na resposta e desliga cache (<code>Cache-Control</code>, <code>Pragma</code>).</li>
+      <li>Em um POST, procura <code>X-HTTP-Method-Override</code> ou <code>?_method=</code> e despacha para <code>doPut</code> ou <code>doDelete</code>. Usa <code>switch</code> com String, recurso novo do Java 7.</li>
+      <li><code>parametroDaQueryString()</code> lê parâmetros só da query string, para não consumir o corpo JSON.</li>
+      <li><code>json()</code> e <code>erro()</code> padronizam as respostas. Com <code>?suppress_response_codes=true</code> o status HTTP vira sempre 200.</li>
+    </ul>
+  </article>
+  <article class="comp c-web" id="c-ContatoServlet">
+    <header><h4>ContatoServlet</h4><span class="loc">@WebServlet("/api/contatos", "/api/contatos/*"), 158 linhas</span></header>
+    <p>Implementa o CRUD HTTP. Extrai o id da URL, converte o corpo com Gson e traduz exceções em códigos HTTP.</p>
+    <ul>
+      <li><code>idDaUrl()</code> lê o <code>pathInfo</code>; id não numérico gera 400 “Id inválido”.</li>
+      <li><code>ValidacaoException</code> vira 400 com a lista <code>detalhes</code>; <code>SQLException</code> vira 500 e é registrada no log.</li>
+      <li>Na criação, devolve 201 e o header <code>Location</code> com a URL do novo contato.</li>
+    </ul>
+  </article>
+  <article class="comp c-web" id="c-HealthServlet">
+    <header><h4>HealthServlet</h4><span class="loc">@WebServlet("/api/health"), 36 linhas</span></header>
+    <p>Verificação de saúde. Informa versão do Java e do servidor, tenta abrir uma conexão e reporta o produto e a versão do banco. Responde <code>UP</code> com 200 ou <code>DOWN</code> com 503. Útil como health check de contêiner ou balanceador.</p>
+  </article>
+
+  <div class="layer"><h3 style="color:var(--svc)">Camada de serviço</h3><span class="path">br.ufpi.agenda.service</span></div>
+  <article class="comp c-svc" id="c-ContatoService">
+    <header><h4>ContatoService</h4><span class="loc">48 linhas</span></header>
+    <p>Fachada das regras de negócio. Valida antes de gravar, força <code>id = null</code> na criação e usa o id da URL na atualização (o id do corpo é ignorado). Recebe DAO e validador pelo construtor, o que permite trocar por dublês em testes.</p>
+  </article>
+  <article class="comp c-svc" id="c-ContatoValidator">
+    <header><h4>ContatoValidator</h4><span class="loc">101 linhas, sem dependência de banco</span></header>
+    <p>Primeiro normaliza, depois valida, acumulando todos os erros em vez de parar no primeiro.</p>
+    <ul>
+      <li>Normalização: <code>trim</code>, texto vazio vira <code>null</code>, itens vazios e duplicados saem das listas.</li>
+      <li>Nome obrigatório, até 120 caracteres. E-mail até 150 e no formato <code>algo@algo.algo</code>.</li>
+      <li>Telefone: de 6 a 30 caracteres entre dígitos, espaço e <code>+ ( ) - .</code></li>
+      <li>Limites do endereço: rua 200, CEP 20, cidade 100, estado 60, país 60.</li>
+    </ul>
+  </article>
+  <article class="comp c-svc" id="c-ValidacaoException">
+    <header><h4>ValidacaoException</h4><span class="loc">checked exception, 32 linhas</span></header>
+    <p>Carrega a lista de erros e monta a mensagem juntando-os com “; ”. A junção é manual porque <code>String.join</code> só chegou no Java 8.</p>
+  </article>
+
+  <div class="layer"><h3 style="color:var(--dao)">Camada de persistência</h3><span class="path">br.ufpi.agenda.dao</span></div>
+  <article class="comp c-dao" id="c-ContatoDao">
+    <header><h4>ContatoDao</h4><span class="loc">238 linhas</span></header>
+    <p>JDBC puro com <code>PreparedStatement</code> (protege contra SQL injection) e try-with-resources (fecha conexões automaticamente).</p>
+    <ul>
+      <li><code>inserir</code> e <code>atualizar</code> rodam em transação manual: <code>setAutoCommit(false)</code>, <code>commit</code> ou <code>rollback</code>.</li>
+      <li>Na atualização, telefones e e-mails antigos são apagados e reinseridos na ordem recebida.</li>
+      <li>Telefones e e-mails são gravados em lote (<code>addBatch</code>) com a coluna <code>ordem</code>.</li>
+      <li>Na leitura, carrega as listas de todos os contatos com duas consultas <code>IN (…)</code>, evitando o problema N+1.</li>
+      <li>A exclusão apaga só a linha de <code>contato</code>; as listas saem por <code>ON DELETE CASCADE</code>.</li>
+    </ul>
+  </article>
+  <article class="comp c-dao" id="c-ConnectionFactory">
+    <header><h4>ConnectionFactory</h4><span class="loc">final, 37 linhas</span></header>
+    <p>Carrega o driver <code>com.mysql.jdbc.Driver</code> e abre conexões via <code>DriverManager</code>. Lê <code>DB_URL</code>, <code>DB_USER</code> e <code>DB_PASSWORD</code> do ambiente; sem elas, usa <code>jdbc:mysql://db:3306/agenda</code> com usuário e senha <code>agenda</code>.</p>
+  </article>
+
+  <div class="layer"><h3 style="color:var(--mod)">Modelo</h3><span class="path">br.ufpi.agenda.model</span></div>
+  <article class="comp c-mod" id="c-Contato">
+    <header><h4>Contato e Endereco</h4><span class="loc">POJOs Serializable, 38 e 41 linhas</span></header>
+    <p>Objetos simples com getters e setters, serializados diretamente pelo Gson. Os setters de <code>Contato</code> trocam <code>null</code> por lista vazia ou <code>new Endereco()</code>, então o resto do código nunca precisa checar nulo nessas propriedades. O endereço não tem tabela própria: vive nas colunas de <code>contato</code>.</p>
+  </article>
+</section>
+
+<!-- ================= FLUXO ================= -->
+<section id="fluxo">
+  <h2>Fluxo de uma requisição</h2>
+  <p>O caminho completo de um <code>POST /api/contatos</code> que cria um contato, do cliente ao banco e de volta.</p>
+
+<pre class="mermaid">
+%%{init: {"theme":"base","themeVariables":{"primaryColor":"#E5F3F4","primaryBorderColor":"#0E7C86","primaryTextColor":"#17202C","actorBkg":"#FFFFFF","actorBorder":"#566273","signalColor":"#566273","signalTextColor":"#17202C","noteBkgColor":"#FBF0E4","noteBorderColor":"#B0601A","labelBoxBkgColor":"#EEECFA","labelBoxBorderColor":"#5B4BC4","fontFamily":"IBM Plex Sans, sans-serif"}}}%%
+sequenceDiagram
+  autonumber
+  participant C as Cliente
+  participant A as ApiServlet.service()
+  participant S as ContatoServlet
+  participant Sv as ContatoService
+  participant V as ContatoValidator
+  participant D as ContatoDao
+  participant DB as MySQL
+  C->>A: POST /api/contatos com JSON
+  A->>A: UTF-8, no-cache, checa _method
+  A->>S: doPost()
+  S->>S: lerContato() com Gson
+  S->>Sv: criar(contato)
+  Sv->>V: normalizarEValidar(c)
+  alt dados inválidos
+    V--)S: ValidacaoException
+    S--)C: 400 com erro, status e detalhes
+  else dados válidos
+    Sv->>D: inserir(c)
+    D->>DB: BEGIN e INSERT INTO contato
+    DB--)D: id gerado
+    D->>DB: INSERT telefones e e-mails em lote
+    D->>DB: COMMIT
+    D--)Sv: contato com id
+    Sv--)S: contato
+    S--)C: 201 Created e header Location
+  end
+</pre>
+
+  <ol class="steps">
+    <li><b>Entrada comum.</b> O Tomcat entrega a requisição a <code>ApiServlet.service()</code>, que configura UTF-8 e cache e decide qual método chamar. Para um POST sem override, chama <code>doPost()</code>.</li>
+    <li><b>Conversão.</b> <code>ContatoServlet</code> lê o corpo inteiro, rejeita corpo vazio e converte o JSON em <code>Contato</code>. JSON malformado gera 400.</li>
+    <li><b>Regras.</b> <code>ContatoService.criar()</code> chama o validador, que limpa os dados e lança <code>ValidacaoException</code> se houver qualquer erro.</li>
+    <li><b>Gravação.</b> <code>ContatoDao.inserir()</code> abre uma conexão, desliga o autocommit, insere o contato, recupera o id gerado e grava as listas. Qualquer falha desfaz tudo.</li>
+    <li><b>Resposta.</b> O servlet devolve 201 com o contato completo em JSON e o header <code>Location: /api/contatos/{id}</code>.</li>
+  </ol>
+
+  <h3>Como a listagem evita o problema N+1</h3>
+  <p>Uma implementação ingênua faria uma consulta de telefones e outra de e-mails para cada contato: com 100 contatos, 201 consultas. O DAO faz sempre três, qualquer que seja o tamanho da lista.</p>
+<pre class="mermaid">
+%%{init: {"theme":"base","themeVariables":{"primaryColor":"#FBF0E4","primaryBorderColor":"#B0601A","primaryTextColor":"#17202C","lineColor":"#566273","fontFamily":"IBM Plex Sans, sans-serif"}}}%%
+flowchart LR
+  A["Consulta 1&lt;br/&gt;SELECT … FROM contato&lt;br/&gt;WHERE filtro ORDER BY nome"] --&gt; B["LinkedHashMap&lt;br/&gt;id → Contato&lt;br/&gt;(preserva a ordem)"]
+  B --&gt; C["Consulta 2&lt;br/&gt;telefones WHERE contato_id IN (?,?,…)"]
+  B --&gt; D["Consulta 3&lt;br/&gt;e-mails WHERE contato_id IN (?,?,…)"]
+  C --&gt; E["Preenche as listas&lt;br/&gt;de cada Contato pelo id"]
+  D --&gt; E
+  E --&gt; F["List de Contato&lt;br/&gt;pronta para o Gson"]
+</pre>
+</section>
+
+<!-- ================= DADOS ================= -->
+<section id="dados">
+  <h2>Modelo de dados</h2>
+  <p>O zip não traz o script SQL, então o esquema abaixo foi <b>inferido</b> das consultas do DAO e dos limites do validador. Os tamanhos de coluna são uma suposição coerente com o validador.</p>
+  <div class="two">
+<pre class="mermaid">
+%%{init: {"theme":"base","themeVariables":{"primaryColor":"#E7EFF8","primaryBorderColor":"#2F6FB0","primaryTextColor":"#17202C","lineColor":"#566273","tertiaryColor":"#FFFFFF","fontFamily":"IBM Plex Sans, sans-serif"}}}%%
+erDiagram
+  CONTATO ||--o{ CONTATO_TELEFONE : "tem"
+  CONTATO ||--o{ CONTATO_EMAIL : "tem"
+  CONTATO {
+    bigint id PK
+    varchar nome "até 120"
+    varchar rua "até 200"
+    varchar cep "até 20"
+    varchar cidade "até 100"
+    varchar estado "até 60"
+    varchar pais "até 60"
+  }
+  CONTATO_TELEFONE {
+    bigint id PK
+    bigint contato_id FK "ON DELETE CASCADE"
+    varchar numero "até 30"
+    int ordem
+  }
+  CONTATO_EMAIL {
+    bigint id PK
+    bigint contato_id FK "ON DELETE CASCADE"
+    varchar email "até 150"
+    int ordem
+  }
+</pre>
+    <div>
+      <h3 style="margin-top:0">Do JSON às tabelas</h3>
+      <p class="small">Um único objeto JSON é dividido em três tabelas. A coluna <code>ordem</code> guarda a posição de cada item, para que as listas voltem na mesma sequência.</p>
+<div class="code">{
+  <span style="color:#BE3A69">"id"</span>: 7,                     <span style="color:#566273">→ contato.id</span>
+  <span style="color:#BE3A69">"nome"</span>: "Ana Souza",          <span style="color:#566273">→ contato.nome</span>
+  <span style="color:#BE3A69">"telefones"</span>: [               <span style="color:#566273">→ contato_telefone</span>
+    "(86) 99999-0000",          <span style="color:#566273">  ordem 0</span>
+    "(86) 3215-0000"            <span style="color:#566273">  ordem 1</span>
+  ],
+  <span style="color:#BE3A69">"emails"</span>: ["ana@ufpi.edu.br"], <span style="color:#566273">→ contato_email</span>
+  <span style="color:#BE3A69">"endereco"</span>: {                 <span style="color:#566273">→ colunas de contato</span>
+    "rua": "Av. Universitária",
+    "cep": "64049-550",
+    "cidade": "Teresina",
+    "estado": "PI",
+    "pais": "Brasil"
+  }
+}</div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= API ================= -->
+<section id="api">
+  <h2>Endpoints da API</h2>
+  <p>Seis rotas, todas sob <code>/api</code>. Escolha uma para ver um exemplo de requisição e das respostas possíveis.</p>
+  <div class="api">
+    <div class="ep-list" role="tablist" aria-label="Endpoints" id="epList"></div>
+    <div class="panel ep-detail" role="tabpanel" id="epDetail" aria-live="polite"></div>
+  </div>
+</section>
+
+<!-- ================= FLASH ================= -->
+<section id="flash">
+  <h2>Adaptações para o cliente Flash</h2>
+  <p>O código foi pensado para um frontend Flex rodando no Flash Player, que tem três limitações. A <code>ApiServlet</code> e o <code>crossdomain.xml</code> resolvem cada uma delas sem quebrar clientes REST comuns.</p>
+  <table>
+    <thead><tr><th>Limitação do Flash</th><th>Solução no backend</th></tr></thead>
+    <tbody>
+      <tr><td>Só envia GET e POST</td><td>POST com <code>?_method=PUT</code> ou <code>DELETE</code> (ou o header <code>X-HTTP-Method-Override</code>) é despachado para <code>doPut</code> ou <code>doDelete</code>.</td></tr>
+      <tr><td>Não entrega ao ActionScript o corpo de respostas 4xx e 5xx</td><td>Com <code>?suppress_response_codes=true</code> o status HTTP é sempre 200 e o código real vai no campo <code>status</code> do JSON.</td></tr>
+      <tr><td>Bloqueia chamadas a outro domínio ou porta</td><td><code>crossdomain.xml</code> na raiz autoriza SWFs de qualquer origem a chamar a API.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Simulador: o que chega e o que volta</h3>
+  <div class="panel">
+    <div class="controls">
+      <div class="field">Cliente
+        <div class="seg" data-group="cli"><button aria-pressed="true" data-v="rest">REST comum</button><button aria-pressed="false" data-v="flash">Flash</button></div>
+      </div>
+      <div class="field">Operação desejada
+        <div class="seg" data-group="op"><button aria-pressed="false" data-v="GET">Buscar</button><button aria-pressed="false" data-v="POST">Criar</button><button aria-pressed="true" data-v="PUT">Atualizar</button><button aria-pressed="false" data-v="DELETE">Excluir</button></div>
+      </div>
+      <div class="field">Resultado
+        <div class="seg" data-group="res"><button aria-pressed="true" data-v="ok">Sucesso</button><button aria-pressed="false" data-v="err">Erro</button></div>
+      </div>
+    </div>
+    <div class="trace" aria-live="polite">
+      <div class="box"><h4>1. Requisição enviada</h4><pre id="simReq"></pre></div>
+      <div class="box"><h4>2. Decisão em ApiServlet.service()</h4><pre id="simDisp"></pre></div>
+      <div class="box"><h4>3. Resposta recebida</h4><pre id="simResp"></pre></div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= VALIDAÇÃO ================= -->
+<section id="validacao">
+  <h2>Validação na prática</h2>
+  <p>Este formulário reproduz em JavaScript as mesmas regras do <code>ContatoValidator</code>. Experimente espaços extras, linhas vazias, duplicatas ou um e-mail sem arroba e veja o que a API devolveria.</p>
+  <div class="panel">
+    <div class="form-grid">
+      <label class="full">Nome <input id="vNome" value="  Ana Souza  "></label>
+      <label>Telefones <span class="hint">um por linha</span><textarea id="vTel"> (86) 99999-0000
+
+(86) 99999-0000</textarea></label>
+      <label>E-mails <span class="hint">um por linha</span><textarea id="vEmail">ana@ufpi.edu.br
+   </textarea></label>
+      <label>Cidade <input id="vCidade" value="  Teresina "></label>
+      <label>CEP <input id="vCep" value="64049-550"></label>
+    </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin:16px 0 4px">
+      <button class="btn" id="vRun">Validar como a API</button>
+      <button class="btn ghost" id="vBad">Preencher exemplo inválido</button>
+    </div>
+    <p class="code-label" id="vLabel"></p>
+    <div class="code" id="vOut" aria-live="polite"></div>
+  </div>
+</section>
+
+<!-- ================= DEPLOY ================= -->
+<section id="deploy">
+  <h2>Build e implantação</h2>
+  <p>O <code>Dockerfile</code> usa duas etapas. A primeira compila com Maven numa imagem com JDK 8, mas gerando bytecode 1.7; a segunda copia só o WAR para um Tomcat 7 com JRE 7. A imagem final não carrega Maven nem código-fonte.</p>
+<pre class="mermaid">
+%%{init: {"theme":"base","themeVariables":{"primaryColor":"#FFFFFF","primaryBorderColor":"#566273","primaryTextColor":"#17202C","lineColor":"#566273","clusterBkg":"#F7F8FA","clusterBorder":"#B9C2CE","fontFamily":"IBM Plex Sans, sans-serif"}}}%%
+flowchart LR
+  subgraph E1["Etapa 1: build (maven:3.8.8-eclipse-temurin-8)"]
+    A["COPY pom.xml"] --&gt; B["mvn dependency:go-offline&lt;br/&gt;(camada de cache)"]
+    B --&gt; C["COPY src"] --&gt; D["mvn package&lt;br/&gt;compila e roda os testes"]
+  end
+  D --&gt; W[("agenda-backend.war")]
+  subgraph E2["Etapa 2: runtime (tomcat:7-jre7)"]
+    R["remove webapps padrão"] --&gt; X["webapps/ROOT.war&lt;br/&gt;TZ=America/Fortaleza"]
+    X --&gt; P(("porta 8080"))
+  end
+  W --&gt; X
+  X -. "JDBC: DB_URL, DB_USER, DB_PASSWORD" .-&gt; M[("MySQL 5.7&lt;br/&gt;host db:3306")]
+</pre>
+  <h3>Dependências do pom.xml</h3>
+  <table>
+    <thead><tr><th>Artefato</th><th>Versão</th><th>Escopo</th><th>Por que esta versão</th></tr></thead>
+    <tbody>
+      <tr><td><code>javax.servlet-api</code></td><td>3.0.1</td><td>provided</td><td>É a API que o Tomcat 7 já fornece; não vai dentro do WAR.</td></tr>
+      <tr><td><code>mysql-connector-java</code></td><td>5.1.49</td><td>compile</td><td>Última linha do driver compatível com Java 7 e MySQL 5.7.</td></tr>
+      <tr><td><code>gson</code></td><td>2.8.9</td><td>compile</td><td>A série 2.8 ainda roda em Java 6 e 7.</td></tr>
+      <tr><td><code>junit</code></td><td>4.13.2</td><td>test</td><td>Usado só no build, para o teste do validador.</td></tr>
+    </tbody>
+  </table>
+  <p class="small muted" style="margin-top:12px">Ao subir com Docker, a aplicação fica na raiz (<code>http://localhost:8080/</code>) porque o WAR é renomeado para <code>ROOT.war</code>. Comentários no código citam a porta 8081 e um <code>docker-compose.yml</code>, que deve mapear essa porta e criar o serviço <code>db</code>.</p>
+</section>
+
+<!-- ================= TESTES ================= -->
+<section id="testes">
+  <h2>Testes</h2>
+  <p>Há uma classe de teste, focada na única parte do sistema que não depende de banco nem de servidor: o validador. São quatro casos, executados pelo Surefire em <code>mvn package</code>.</p>
+  <table>
+    <thead><tr><th>Teste</th><th>O que verifica</th></tr></thead>
+    <tbody>
+      <tr><td><code>normalizaEspacosListasVaziasEDuplicadas</code></td><td>Trim no nome e na cidade, remoção de telefone vazio, nulo e duplicado, e-mail em branco descartado, rua só com espaços vira <code>null</code>.</td></tr>
+      <tr><td><code>rejeitaNomeVazioEEmailInvalido</code></td><td>Os dois erros são acumulados numa só exceção, e a mensagem cita o nome e o e-mail inválido.</td></tr>
+      <tr><td><code>aceitaListasNulasEEnderecoNulo</code></td><td>Listas e endereço nulos são aceitos e convertidos em valores vazios.</td></tr>
+      <tr><td><code>rejeitaTelefoneComLetras</code></td><td>“ligar depois” não passa na regex de telefone.</td></tr>
+    </tbody>
+  </table>
+  <p class="small muted" style="margin-top:12px">Não há testes para <code>ContatoDao</code>, <code>ContatoService</code> nem para os servlets. O construtor de <code>ContatoService</code> que recebe DAO e validador já abre caminho para testá-lo com dublês.</p>
+</section>
+
+<!-- ================= ATENÇÃO ================= -->
+<section id="atencao">
+  <h2>Pontos de atenção</h2>
+  <p>O código é limpo e didático, mas alguns aspectos precisam de cuidado antes de um uso real.</p>
+  <div class="panel">
+    <div class="risk"><span class="sev sev-a">Alta</span><div><h4>Arquivos ausentes no pacote</h4><p>Faltam o script SQL de criação das tabelas e o <code>docker-compose.yml</code> citado na <code>ConnectionFactory</code>. Sem eles o projeto compila, mas não sobe completo.</p></div></div>
+    <div class="risk"><span class="sev sev-a">Alta</span><div><h4>Sem autenticação</h4><p>Qualquer cliente que alcance a porta pode listar, alterar e apagar contatos.</p></div></div>
+    <div class="risk"><span class="sev sev-m">Média</span><div><h4><code>crossdomain.xml</code> aberto para qualquer domínio</h4><p><code>allow-access-from domain="*"</code> deixa SWFs de qualquer site chamarem a API. O próprio comentário pede restrição em produção.</p></div></div>
+    <div class="risk"><span class="sev sev-m">Média</span><div><h4>Detalhes internos nas respostas 500</h4><p>A mensagem da <code>SQLException</code> vai para o cliente, o que pode expor nomes de tabelas ou do host do banco.</p></div></div>
+    <div class="risk"><span class="sev sev-m">Média</span><div><h4>Sem pool de conexões</h4><p>Cada operação abre uma conexão nova com <code>DriverManager</code>. Sob carga, isso é lento e pode esgotar conexões do MySQL. Um <code>DataSource</code> do Tomcat resolveria.</p></div></div>
+    <div class="risk"><span class="sev sev-b">Baixa</span><div><h4>Busca com <code>LIKE '%texto%'</code> e listagem sem paginação</h4><p>O curinga inicial impede o uso de índice, e <code>GET /api/contatos</code> devolve todos os registros. Ok para uma agenda pequena, não para milhares de contatos.</p></div></div>
+    <div class="risk"><span class="sev sev-b">Baixa</span><div><h4>Pilha tecnológica fora de suporte</h4><p>Java 7, Tomcat 7 e MySQL 5.7 já não recebem atualizações de segurança. A escolha faz sentido para compatibilidade com um ambiente legado, mas deve ser consciente.</p></div></div>
+  </div>
+</section>
+
+<footer>Gerado a partir da análise do arquivo <code>backend.zip</code> (pacote <code>br.ufpi.agenda</code>, artefato <code>agenda-backend 1.0.0</code>).</footer>
+</main>
+</div>
+
+<script>
+(function(){
+  // ---------- Diagrama clicável ----------
+  function irPara(id){
+    var alvo = id === 'schema' ? document.getElementById('dados') : document.getElementById('c-' + id);
+    if(!alvo) return;
+    alvo.scrollIntoView({behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block:'center'});
+    if(alvo.classList.contains('comp')){
+      alvo.classList.add('flash');
+      setTimeout(function(){alvo.classList.remove('flash');}, 1800);
+    }
+  }
+  document.querySelectorAll('[data-comp]').forEach(function(el){
+    el.addEventListener('click', function(){irPara(el.getAttribute('data-comp'));});
+    el.addEventListener('keydown', function(e){ if(e.key==='Enter'||e.key===' '){e.preventDefault();irPara(el.getAttribute('data-comp'));} });
+  });
+
+  // ---------- Navegação ativa ----------
+  var links = Array.prototype.slice.call(document.querySelectorAll('nav.side a'));
+  if('IntersectionObserver' in window){
+    var obs = new IntersectionObserver(function(entries){
+      entries.forEach(function(en){
+        if(en.isIntersecting){
+          links.forEach(function(a){a.classList.toggle('active', a.getAttribute('href') === '#' + en.target.id);});
+        }
+      });
+    }, {rootMargin:'-30% 0px -60% 0px'});
+    document.querySelectorAll('main section').forEach(function(s){obs.observe(s);});
+  }
+
+  function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+  function J(o){return JSON.stringify(o, null, 2);}
+
+  var contatoEx = {id:7,nome:'Ana Souza',telefones:['(86) 99999-0000'],emails:['ana@ufpi.edu.br'],endereco:{rua:'Av. Universitária',cep:'64049-550',cidade:'Teresina',estado:'PI',pais:'Brasil'}};
+  var corpoEx = {nome:'Ana Souza',telefones:['(86) 99999-0000'],emails:['ana@ufpi.edu.br'],endereco:{cidade:'Teresina',estado:'PI'}};
+
+  // ---------- Explorador de endpoints ----------
+  var eps = [
+    {v:'GET', p:'/api/contatos', d:'Lista todos os contatos em ordem alfabética. O parâmetro opcional q filtra por trecho do nome, de um e-mail ou de um telefone.',
+     req:'GET /api/contatos?q=ana',
+     res:[{s:200,t:'Lista de contatos',b:J([contatoEx])}]},
+    {v:'GET', p:'/api/contatos/{id}', d:'Busca um contato pelo id, com telefones e e-mails na ordem em que foram gravados.',
+     req:'GET /api/contatos/7',
+     res:[{s:200,t:'Encontrado',b:J(contatoEx)},{s:404,t:'Id inexistente',b:J({erro:'Contato 99 não encontrado',status:404})},{s:400,t:'Id não numérico',b:J({erro:'Id inválido: abc',status:400})}]},
+    {v:'POST', p:'/api/contatos', d:'Cria um contato. Qualquer id enviado no corpo é ignorado; o banco gera um novo.',
+     req:'POST /api/contatos\nContent-Type: application/json\n\n' + J(corpoEx),
+     res:[{s:201,t:'Criado (header Location: /api/contatos/7)',b:J(Object.assign({},contatoEx,{endereco:{rua:null,cep:null,cidade:'Teresina',estado:'PI',pais:null}}))},
+          {s:400,t:'Falha de validação',b:J({erro:'O nome é obrigatório; E-mail inválido: sem-arroba',status:400,detalhes:['O nome é obrigatório','E-mail inválido: sem-arroba']})}]},
+    {v:'PUT', p:'/api/contatos/{id}', d:'Substitui todos os dados do contato. Telefones e e-mails são apagados e regravados. Clientes Flash usam POST com ?_method=PUT.',
+     req:'PUT /api/contatos/7\nContent-Type: application/json\n\n' + J({nome:'Ana Souza Lima',telefones:['(86) 98888-1111'],emails:[]}),
+     res:[{s:200,t:'Atualizado',b:J({id:7,nome:'Ana Souza Lima',telefones:['(86) 98888-1111'],emails:[],endereco:{rua:null,cep:null,cidade:null,estado:null,pais:null}})},{s:404,t:'Id inexistente',b:J({erro:'Contato 99 não encontrado',status:404})}]},
+    {v:'DELETE', p:'/api/contatos/{id}', d:'Exclui o contato. Telefones e e-mails saem junto por ON DELETE CASCADE. Clientes Flash usam POST com ?_method=DELETE.',
+     req:'DELETE /api/contatos/7',
+     res:[{s:200,t:'Excluído',b:J({excluido:7})},{s:404,t:'Id inexistente',b:J({erro:'Contato 99 não encontrado',status:404})}]},
+    {v:'GET', p:'/api/health', d:'Verificação de saúde: versão do Java, do servidor e do banco. Responde 503 quando o banco está fora.',
+     req:'GET /api/health',
+     res:[{s:200,t:'Banco acessível',b:J({java:'1.7.0_xx',servidor:'Apache Tomcat/7.0.x',banco:'MySQL 5.7.x',status:'UP'})},{s:503,t:'Banco inacessível',b:J({java:'1.7.0_xx',servidor:'Apache Tomcat/7.0.x',status:'DOWN',erro:'Communications link failure'})}]}
+  ];
+  var list = document.getElementById('epList'), det = document.getElementById('epDetail');
+  function mostrar(i){
+    Array.prototype.forEach.call(list.children, function(b,j){b.setAttribute('aria-selected', j===i ? 'true':'false'); b.tabIndex = j===i ? 0 : -1;});
+    var e = eps[i], h = '<h3><span class="verb v-'+e.v+'">'+e.v+'</span> '+esc(e.p)+'</h3><p>'+esc(e.d)+'</p>';
+    h += '<p class="code-label">Requisição</p><div class="code">'+esc(e.req)+'</div>';
+    e.res.forEach(function(r){
+      h += '<p class="code-label"><span class="status '+(r.s<400?'s-ok':'s-bad')+'">'+r.s+'</span>'+esc(r.t)+'</p><div class="code">'+esc(r.b)+'</div>';
+    });
+    det.innerHTML = h;
+  }
+  eps.forEach(function(e,i){
+    var b = document.createElement('button');
+    b.className='ep'; b.setAttribute('role','tab');
+    b.innerHTML = '<span class="verb v-'+e.v+'">'+e.v+'</span><code>'+esc(e.p)+'</code>';
+    b.addEventListener('click', function(){mostrar(i);});
+    b.addEventListener('keydown', function(ev){
+      if(ev.key==='ArrowDown'||ev.key==='ArrowUp'){ev.preventDefault();var n=(i+(ev.key==='ArrowDown'?1:-1)+eps.length)%eps.length;mostrar(n);list.children[n].focus();}
+    });
+    list.appendChild(b);
+  });
+  mostrar(0);
+
+  // ---------- Simulador Flash ----------
+  var st = {cli:'rest', op:'PUT', res:'ok'};
+  document.querySelectorAll('.seg').forEach(function(g){
+    g.addEventListener('click', function(ev){
+      var b = ev.target.closest('button'); if(!b) return;
+      g.querySelectorAll('button').forEach(function(x){x.setAttribute('aria-pressed', x===b ? 'true':'false');});
+      st[g.getAttribute('data-group')] = b.getAttribute('data-v');
+      simular();
+    });
+  });
+  function simular(){
+    var flash = st.cli==='flash', op = st.op, ok = st.res==='ok';
+    var path = op==='POST' ? '/api/contatos' : '/api/contatos/' + (ok ? '7' : '99');
+    var qs = [], verbo = op;
+    if(flash && (op==='PUT'||op==='DELETE')){ verbo='POST'; qs.push('_method='+op); }
+    if(flash) qs.push('suppress_response_codes=true');
+    var req = verbo + ' ' + path + (qs.length ? '?' + qs.join('&') : '');
+    if(op==='POST'||op==='PUT') req += '\nContent-Type: application/json\n\n' + (op==='POST' && !ok ? '{"nome": "  "}' : '{"nome": "Ana Souza", …}');
+
+    var disp;
+    if(verbo==='POST' && op!=='POST') disp = 'Método HTTP: POST\nOverride encontrado: _method=' + op + '\n→ chama do' + op.charAt(0) + op.slice(1).toLowerCase() + '()';
+    else disp = 'Método HTTP: ' + verbo + '\nSem override\n→ chama do' + verbo.charAt(0) + verbo.slice(1).toLowerCase() + '()';
+    disp += flash ? '\n\nsuppress_response_codes=true:\nstatus HTTP será forçado a 200' : '\n\nStatus HTTP real é mantido';
+
+    var real, corpo;
+    if(ok){
+      real = op==='POST' ? 201 : 200;
+      corpo = op==='DELETE' ? {excluido:7} : {id:7, nome:'Ana Souza', '…':'…'};
+    } else if(op==='POST'){
+      real = 400; corpo = {erro:'O nome é obrigatório', status:400, detalhes:['O nome é obrigatório']};
+    } else {
+      real = 404; corpo = {erro:'Contato 99 não encontrado', status:404};
+    }
+    var visto = flash ? 200 : real;
+    var nomes = {200:'OK',201:'Created',400:'Bad Request',404:'Not Found'};
+    var resp = 'HTTP/1.1 ' + visto + ' ' + nomes[visto] + '\n\n' + J(corpo);
+    if(flash && real!==visto) resp += '\n\n(o código real, ' + real + ', está no campo "status")';
+    if(flash && real===visto && !ok) resp += '';
+    document.getElementById('simReq').textContent = req;
+    document.getElementById('simDisp').textContent = disp;
+    document.getElementById('simResp').textContent = resp;
+  }
+  simular();
+
+  // ---------- Validador ----------
+  var EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+  var TEL = /^[0-9+()\-.\s]{6,30}$/;
+  function limpar(s){ if(s==null) return null; var t=String(s).trim(); return t==='' ? null : t; }
+  function limparLista(txt){ var r=[]; txt.split('\n').forEach(function(l){var t=limpar(l); if(t!==null && r.indexOf(t)<0) r.push(t);}); return r; }
+  function validar(){
+    var c = {id:null, nome:limpar(document.getElementById('vNome').value),
+      telefones:limparLista(document.getElementById('vTel').value),
+      emails:limparLista(document.getElementById('vEmail').value),
+      endereco:{rua:null, cep:limpar(document.getElementById('vCep').value), cidade:limpar(document.getElementById('vCidade').value), estado:null, pais:null}};
+    var erros=[];
+    if(c.nome===null) erros.push('O nome é obrigatório');
+    else if(c.nome.length>120) erros.push('O nome deve ter no máximo 120 caracteres');
+    c.telefones.forEach(function(t){ if(!TEL.test(t)) erros.push('Telefone inválido: ' + t); });
+    c.emails.forEach(function(e){ if(e.length>150 || !EMAIL.test(e)) erros.push('E-mail inválido: ' + e); });
+    if(c.endereco.cep && c.endereco.cep.length>20) erros.push('O campo CEP deve ter no máximo 20 caracteres');
+    if(c.endereco.cidade && c.endereco.cidade.length>100) erros.push('O campo cidade deve ter no máximo 100 caracteres');
+    var lab = document.getElementById('vLabel'), out = document.getElementById('vOut');
+    if(erros.length){
+      lab.innerHTML = '<span class="status s-bad">400</span>A API rejeitaria e listaria todos os erros de uma vez';
+      out.textContent = J({erro:erros.join('; '), status:400, detalhes:erros});
+    } else {
+      c.id = 8;
+      lab.innerHTML = '<span class="status s-ok">201</span>Dados aceitos; é isto que seria gravado e devolvido';
+      out.textContent = J(c);
+    }
+  }
+  document.getElementById('vRun').addEventListener('click', validar);
+  document.getElementById('vBad').addEventListener('click', function(){
+    document.getElementById('vNome').value = '   ';
+    document.getElementById('vTel').value = 'ligar depois\n(86) 99999-0000';
+    document.getElementById('vEmail').value = 'sem-arroba\nana@ufpi.edu.br';
+    validar();
+  });
+  validar();
+})();
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({startOnLoad:true});</script>
+</body>
+</html>
